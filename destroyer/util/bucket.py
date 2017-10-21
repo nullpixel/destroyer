@@ -1,7 +1,7 @@
 from time import time
 
 def ms_time():
-    return int(time * 1000)
+    return int(time() * 1000)
 
 # thanks b1nzy, for leakybucket https://github.com/b1naryth1ef/rowboat/blob/95e568324cd5edef8e97f59873f59de98ddd1376/rowboat/util/leakybucket.py
 INCREMENT_SCRIPT = '''
@@ -29,41 +29,62 @@ class Bucket:
         self.key_format = key_format
         self.max_actions = max_actions
         self.time_period = time_period
-    
-        self._increment_script = self.redis.script_load(INCREMENT_SCRIPT)
-        self._get_script = self.redis.script_load(GET_SCRIPT)
-    
+
+        self._increment_script = None
+        self._get_script = None
+
+    async def _load_scripts(self):
+        with await self.redis as conn:
+            self._increment_script = await conn.script_load(INCREMENT_SCRIPT)
+            self._get_script = await conn.script_load(GET_SCRIPT)
+
     async def incr(self, key, amount=1):
+        if self._increment_script is None:
+            await self._load_scripts()
+
         key = self.key_format.format(key)
-        return int(
-            await self._increment_script(
-                keys=[key],
-                args=[
-                    amount,
-                    ms_time() - self.time_period,
-                    ms_time(),
-                    (self.time_period * 2) / 1000,
-                ]
+        with await self.redis as conn:
+            return int(
+                await conn.evalsha(
+                    self._increment_script,
+                    keys=[key],
+                    args=[
+                        amount,
+                        ms_time() - self.time_period,
+                        ms_time(),
+                        int(self.time_period * 2 / 1000),
+                    ]
+                )
             )
-        )
     
-    def check(self, key, amount=1):
+    async def check(self, key, amount=1):
         count = await self.incr(key, amount)
         if count >= self.max_actions:
             return False
         return True
     
     async def get(self, key):
-        return int(await self._get_script(self.key_format.format(key)))
+        if self._get_script is None:
+            await self._load_scripts()
+
+        with await self.redis as conn:
+            return int(await conn.evalsha(
+                self._get_script,
+                keys=[self.key_format.format(key)]
+                )
+            )
 
     async def clear(self, key):
-        return await self.redis.zremrangebyscore(self.key_format.format(key), '-inf', '+inf')
+        with await self.redis as conn:
+            return await conn.zremrangebyscore(self.key_format.format(key), '-inf', '+inf')
     
     async def count(self, key):
-        return await self.redis.zcount(self.key_fmt.format(key), '-inf', '+inf')
+        with await self.redis as conn:
+            return await conn.zcount(self.key_format.format(key), '-inf', '+inf')
 
-    def size(self, key):
-        res = map(int, await self.redis.zrangebyscore(self.key_format.format(key), '-inf', '+inf'))
-        if len(res) <= 1:
-            return 0
-        return (res[-1] - res[0]) / 1000.0
+    async def size(self, key):
+        with await self.redis as conn:
+            res = map(int, await conn.zrangebyscore(self.key_format.format(key), '-inf', '+inf'))
+            if len(res) <= 1:
+                return 0
+            return (res[-1] - res[0]) / 1000.0

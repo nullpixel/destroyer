@@ -1,5 +1,6 @@
 from destroyer.util.bucket import Bucket
 
+
 class Rule:
     # TODO: Document
     def __init__(self, name: str, count: int, interval: int):
@@ -9,13 +10,14 @@ class Rule:
         
         self.spam_key = 'spam:{}:{}:{}'.format(self.name, '{}', '{}')
 
-    def get_bucket(redis, guild_id):
-        bucket = getattr(self, f'_cached_{guild_id}_{self.name}_bucket')
-        if not bucket:
+    def get_bucket(self, redis, guild_id):
+        bucket = getattr(self, f'_cached_{guild_id}_{self.name}_bucket', None)
+        if bucket is None:
             bucket = Bucket(redis, self.spam_key.format(guild_id, '{}'), self.count, self.interval * 1000)
             setattr(self, f'_cached_{guild_id}_{self.name}_bucket', bucket)
         return bucket
 
+
 # TODO: Revise count & interval
-messages = Rule('max_messages', 100, 10)
-mentions = Rule('max_mentions', 100, 10)
+messages = Rule('max_messages', 5, 10)
+mentions = Rule('max_mentions', 3, 10)

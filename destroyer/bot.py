@@ -1,5 +1,4 @@
 import logging
-import sys
 
 import discord
 from discord.ext.commands import Bot as DiscordBot
@@ -15,6 +14,7 @@ COGS = [
     'admin',
     'spam'
 ]
+
 
 class Bot(DiscordBot):
     """ Main bot class for destroyer """
@@ -65,10 +65,10 @@ class Bot(DiscordBot):
     
     async def global_ban(self, user):
         """ Globally bans a user from every guild the bot is in. """
-        for guild in self.bot.guilds:
+        for guild in self.guilds:
             try:
                 await guild.ban(user, reason='Cross ban: spammer.')
-            except discord.Forbidden as err:
+            except discord.HTTPException:
                 log.error('Couldn\'t ban %d on %d', user.id, guild.id)
 
         log.info('Globally banned user (%d)', user.id)
@@ -78,7 +78,7 @@ class Bot(DiscordBot):
         log.info('Logged in to discord as %s (%d)', self.user, self.user.id)
 
     async def on_message(self, message):
-        await self.db['messages'].insert_one(dict(message))
+        # await self.db['messages'].insert_one(dict(message))
 
         author_id = message.author.id
 

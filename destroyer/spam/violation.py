@@ -3,4 +3,5 @@ class Violation(Exception):
         self.rule = rule
         self.message = message
 
-        self.author = self.message.author
+        self.user = message.author
+        self.guild = message.guild
