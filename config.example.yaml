@@ -1,0 +1,3 @@
+token: <BOT TOKEN HERE>
+prefix: b!
+database: mongodb://localhost:27017/

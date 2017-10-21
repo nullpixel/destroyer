@@ -1,0 +1,14 @@
+# Mac
+.DS_STORE
+
+# Ignore python stuff
+env
+
+# VSCode
+.vscode
+
+# Config
+config.yaml
+
+# python
+__pycache__
